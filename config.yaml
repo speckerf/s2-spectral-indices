@@ -1,0 +1,53 @@
+PIPELINE_PARAMS:
+  YEARS: ['2019', '2020', '2021', '2022', '2023', '2024']
+  OUTPUT_RESOLUTION: 100 # in meters
+  CAST_TO_INT8: TRUE
+  INT8_SCALE: 126
+  VERSION: 'v01' # refers to version v1 of the pipeline  
+  MGRS_SUBSET_EXPORT: ["18L", "18M", "18N", "33Q", "34Q", "32N", "33N", "32M", "33M", "54J", "55H", "53M", "54M", "55M"]
+  # MGRS_SUBSET_EXPORT: ["54M", "55M"]
+
+GAPFILLING:
+  INPUT_RESOLUTION: 1000 # in meters
+  VERSION: 'v01' 
+  STRATEGY_ORDER: ['temporal', 'spatial'] # order of gapfilling strategies: 'temporal', 'spatial'
+  # STRATEGY_ORDER: ['spatial', 'temporal'] 
+  TEMPORAL_EXP_DECAY: 0.75
+  BITMASK_VALID_INPUT: 0 # bit position for valid s2 srf inputs
+  BITMASK_VALID_VI: 1 # bit position for cloud free s2 srf inputs
+  BITMASK_TEMP_FILL: 2 # bit position for temporal gapfilling
+  BITMASK_SPAT_FILL: 3 # bit position for spatial gapfilling
+  MAX_YEARS_APART: 3 # max number of years apart for temporal gapfilling / e.g. for 2023: 2021, 2023, 2024 will be used. 
+  # EMPTY_BITS: 4-7 # bit positions for future use
+
+INDICES:
+  - 'NDVI'
+  - 'EVI2'
+  - 'NDWI'
+  - 'NDMI'
+  - 'NBRI'
+  - 'BSI'
+  # - 'SAVI'
+
+S2_FILTERING:
+  MAX_IMAGES_PER_GROUP: 8 # max number of images to be used for images from the same orbit and tile
+  VI_INDEX: 'NDVI' # 'EVI' or 'NDVI', bad results with EVI due to high values in some snow covered areas
+  MAX_VI_DIFFERENCE: 0.20 # max difference in EVI for images, taking all images with MAX_EVI_DIFFERENCE to the VI_MAX_PERCENTILE of EVI values
+  VI_MAX_PERCENTILE: 0.95 # max percentile of EVI values to be used for filtering images
+
+CLOUD_FILTERING:
+  CLOUDY_PIXEL_PERCENTAGE: 70 # max initial cloudy pixel percentage
+  CLOUD_SCORE_PLUS_THRESHOLD: 0.65
+  CLOUD_SCORE_PLUS_BAND: 'cs' # 'cs' or 'cs_cdf' : see https://medium.com/google-earth/all-clear-with-cloud-score-bd6ee2e2235e
+
+GEE_FOLDERS:
+  ASSET_FOLDER: 'projects/ee-speckerfelix/assets/oemc-spectral'
+
+# GCLOUD_FOLDERS:
+#   TEMP_FOLDER: 'gs://felixspecker/open-earth/temp/'
+#   BUCKET: 'felixspecker'
+#   EXPORT_FOLDER_INTERMEDIATE: 'open-earth/trait_maps/intermediate'
+#   EXPORT_FOLDER_FINAL: 'open-earth/trait_maps/merged'
+#   EXPORT_FOLDER_FINAL_PUBLIC: 'gs://felixspecker-public/open-earth/trait_maps'
+
+
