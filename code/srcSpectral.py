@@ -25,6 +25,19 @@ def export_mgrs_tile(mgrs_tile: str, year: int) -> None:
     version = CONFIG["PIPELINE_PARAMS"]["VERSION"]
     output_resolution = CONFIG["PIPELINE_PARAMS"]["OUTPUT_RESOLUTION"]
 
+    # # check if the export has already been done
+    # imgc_folder = (
+    #     CONFIG["GEE_FOLDERS"]["ASSET_FOLDER"]
+    #     + f"/spectral-indices_s2-srf-yearly_{output_resolution}m_{version}/"
+    # )
+    # system_index = f"spectral-indices_s2-srf-yearly_m_{output_resolution}m_s_{year}0101_{year}1231_T{mgrs_tile}_epsg-{get_epsg_code_from_mgrs(mgrs_tile)}_{version}"
+    # if (
+    #     ee.data.getInfo(imgc_folder + system_index) is not None
+    #     and ee.data.getInfo(imgc_folder + system_index)["type"] == "Image"
+    # ):
+    #     logger.info(f"Export already done for mgrs_tile: {mgrs_tile}")
+    #     return
+
     logger.info(f"Exporting mgrs_tile: {mgrs_tile}")
     start_date = ee.Date(f"{year}-01-01")
     end_date = ee.Date(f"{year}-12-31")
@@ -124,7 +137,7 @@ def export_mgrs_tile(mgrs_tile: str, year: int) -> None:
     output_image = (
         output_image.set("system:time_start", ee.Date.fromYMD(int(year), 1, 1).millis())
         .set("system:time_end", ee.Date.fromYMD(int(year), 12, 31).millis())
-        .set("year", year)
+        .set("year", str(year))
         .set("version", version)
         .set("system:index", system_index)
         .set("mgrs_tile", mgrs_tile)
@@ -169,6 +182,48 @@ def export_mgrs_tile(mgrs_tile: str, year: int) -> None:
     time.sleep(0.1)
 
 
+def subset_mgrs_years_tiles(mgrs_tiles: list, years: list, max_tasks: int):
+    total_tasks = len(mgrs_tiles) * len(years)
+    if total_tasks <= max_tasks:
+        return mgrs_tiles, years
+
+    logger.debug(
+        f"Check number of total exports that are still to be executed: {len(mgrs_tiles) * len(years)}"
+    )
+    output_resolution = CONFIG["PIPELINE_PARAMS"]["OUTPUT_RESOLUTION"]
+    version = CONFIG["PIPELINE_PARAMS"]["VERSION"]
+
+    # check if the export has already been done
+    imgc_folder = (
+        CONFIG["GEE_FOLDERS"]["ASSET_FOLDER"]
+        + f"/spectral-indices_s2-srf-yearly_{output_resolution}m_{version}"
+    )
+    system_indices_all = [
+        f"spectral-indices_s2-srf-yearly_m_{output_resolution}m_s_{year}0101_{year}1231_T{mgrs_tile}_epsg-{get_epsg_code_from_mgrs(mgrs_tile)}_{version}"
+        for mgrs_tile in mgrs_tiles
+        for year in years
+    ]
+    system_indices_done = (
+        ee.ImageCollection(imgc_folder).aggregate_array("system:index").getInfo()
+    )
+
+    system_indices_todo = list(set(system_indices_all) - set(system_indices_done))
+
+    if len(system_indices_todo) <= max_tasks:
+        logger.debug(f"Number of tasks to be executed: {len(system_indices_todo)}")
+        return mgrs_tiles, years
+
+    logger.debug(f"Not export all mgrs_tiles and years, only a subset.")
+    # ensure mgrs_tiles_subset * years_subset <= max_tasks
+    mgrs_tiles_subset = list(
+        set([system_index.split("_")[-3][1:5] for system_index in system_indices_todo])
+    )
+    while len(mgrs_tiles_subset) * len(years) > max_tasks:
+        mgrs_tiles_subset.pop()
+
+    return mgrs_tiles_subset, years
+
+
 def global_export_mgrs_tiles(years: list):
     mgrs_tiles = pd.read_csv(
         os.path.join(
@@ -183,6 +238,14 @@ def global_export_mgrs_tiles(years: list):
     mgrs_tiles_list = list(set([*mgrs_tiles_list, *include]))
 
     logger.debug(f"Exporting mgrs_tiles: {mgrs_tiles_list} for years {years}")
+
+    if len((mgrs_tiles_list) * len(years)) > 3000:
+        logger.warning(
+            f"Too many tasks to start: {len((mgrs_tiles_list) * len(years))} > 3000. Only exporting a subset."
+        )
+        mgrs_tiles_list, years = subset_mgrs_years_tiles(
+            mgrs_tiles_list, years, max_tasks=100
+        )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
         futures = [
@@ -202,7 +265,7 @@ def global_export_mgrs_tiles(years: list):
 
 
 def subset_export_mgrs_tiles(years: list | int):
-    if isinstance(years, int):
+    if isinstance(years, int) or isinstance(years, str):
         years = [years]
     mgrs_tiles = pd.read_csv(
         os.path.join(
@@ -243,9 +306,14 @@ def subset_export_mgrs_tiles(years: list | int):
 
 
 if __name__ == "__main__":
+
+    logger.info(f"Output resolution: {CONFIG['GAPFILLING']['INPUT_RESOLUTION']}m")
+    logger.info(f"Version: {CONFIG['GAPFILLING']['VERSION']}")
+
     # wait 1 hour
     # time.sleep(3 * 3600)
     subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
+    # global_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
     # subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
     # subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
     # subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])

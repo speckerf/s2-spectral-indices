@@ -325,6 +325,10 @@ if __name__ == "__main__":
     #     system_index="spectral-indices_s2-srf-yearly_m_1000m_s_20210101_20211231_T55M_epsg-32755_v01"
     # )
     # complete_temporal_gapfill()
+
+    logger.info(f"Output resolution: {CONFIG['GAPFILLING']['INPUT_RESOLUTION']}m")
+    logger.info(f"Version: {CONFIG['GAPFILLING']['VERSION']}")
+
     complete_sequential_gapfill()
     # complete_spatial_gapfill()
     # temporal_gapfilling_test()

@@ -4,11 +4,11 @@ PIPELINE_PARAMS:
   CAST_TO_INT8: TRUE
   INT8_SCALE: 126
   VERSION: 'v01' # refers to version v1 of the pipeline  
-  MGRS_SUBSET_EXPORT: ["18L", "18M", "18N", "33Q", "34Q", "32N", "33N", "32M", "33M", "54J", "55H", "53M", "54M", "55M"]
-  # MGRS_SUBSET_EXPORT: ["54M", "55M"]
+  MGRS_SUBSET_EXPORT: ["18L", "18M", "18N", "33Q", "34Q", "32N", "33N", "32M", "33M", "54J", "55H", "53M", "54M", "55M", "31T", "32T"]
+  # MGRS_SUBSET_EXPORT: ["54M", "55M", "31T", "32T"]
 
 GAPFILLING:
-  INPUT_RESOLUTION: 1000 # in meters
+  INPUT_RESOLUTION: 100 # in meters
   VERSION: 'v01' 
   STRATEGY_ORDER: ['temporal', 'spatial'] # order of gapfilling strategies: 'temporal', 'spatial'
   # STRATEGY_ORDER: ['spatial', 'temporal'] 
