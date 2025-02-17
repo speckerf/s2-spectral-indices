@@ -52,7 +52,10 @@ def get_cumulative_products(factors: list) -> list:
 def get_projection_info(img: ee.Image) -> Tuple[str, list]:
     """Returns the CRS and transform of the given image."""
     proj = img.projection()
-    return proj.crs().getInfo(), proj.getInfo()["transform"]
+    crs = proj.crs().getInfo()
+    transform = proj.getInfo()["transform"]
+    assert len(transform) == 6, "Invalid transform."
+    return crs, transform
 
 
 def compute_reduced_transforms(scale, export_crs_transform):
@@ -127,15 +130,18 @@ def temporally_fill_image(
     img = img.select(CONFIG["INDICES"])
     imgc_filtered = imgc_filtered.select(CONFIG["INDICES"])
 
-    year = ee.Number(img.get("year"))
+    year = ee.Number.parse(img.getString("year"))
     years = imgc_filtered.aggregate_array("year").sort()
+    years = years.map(lambda x: ee.Number.parse(x))
 
     logger.debug(f"Year of img: {year.getInfo()}; Years in imgc: {years.getInfo()}")
 
     def get_fill_image(other_yr: ee.Number) -> ee.Image:
         other_yr = ee.Number(other_yr)
         img_other = imgc_filtered.filterDate(ee.String(other_yr.toInt())).first()
-        other_year_weight = exp_weight(ee.Number(other_yr).subtract(year), decay_factor)
+        other_year_weight = exp_weight(
+            ee.Number(other_yr).subtract(ee.Number(year)), decay_factor
+        )
         year_fill_img = img_other.multiply(other_year_weight)
         return year_fill_img.toFloat()
 
@@ -143,13 +149,23 @@ def temporally_fill_image(
         other_yr = ee.Number(other_yr)
         img_other = imgc_filtered.filterDate(ee.String(other_yr.toInt())).first()
         img_other_mask = img_other.mask()
-        other_year_weight = exp_weight(ee.Number(other_yr).subtract(year), decay_factor)
+        other_year_weight = exp_weight(
+            ee.Number(other_yr).subtract(ee.Number(year)), decay_factor
+        )
         return img_other_mask.multiply(other_year_weight).toFloat()
 
     years_without_self = years.remove(year)
     filter_years_apart = ee.Filter.And(
-        ee.Filter.gte("item", year.subtract(CONFIG["GAPFILLING"]["MAX_YEARS_APART"])),
-        ee.Filter.lte("item", year.add(CONFIG["GAPFILLING"]["MAX_YEARS_APART"])),
+        ee.Filter.gte(
+            "item",
+            ee.Number(year).subtract(
+                ee.Number(CONFIG["GAPFILLING"]["MAX_YEARS_APART"])
+            ),
+        ),
+        ee.Filter.lte(
+            "item",
+            ee.Number(year).add(ee.Number(CONFIG["GAPFILLING"]["MAX_YEARS_APART"])),
+        ),
     )
     years_without_self_filtered = years_without_self.filter(filter_years_apart)
     years_fill_images = years_without_self_filtered.map(get_fill_image)

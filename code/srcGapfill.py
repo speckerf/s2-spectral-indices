@@ -92,15 +92,17 @@ def export_spatial_gapfill(
     )
 
     img_output = ee.Image(
-        img_output.copyProperties(img)
-        .set("system:time_start", img.get("system:time_start"))
-        .set("system:time_end", img.get("system:time_end"))
-        .set("spatial_gapfilling", True)
+        img_output.set("year", img.getString("year"))
+        .set("mgrs_tile", img.getString("mgrs_tile"))
+        .set("version", img.getString("version"))
+        .set("int8_scale", img.getNumber("int8_scale"))
+        .set("system:time_start", img.getNumber("system:time_start"))
+        .set("system:time_end", img.getNumber("system:time_end"))
     )
 
     export_crs, export_crs_transform = get_projection_info(img)
 
-    if temporally_fill_image:
+    if img_temp_gapfilled:
         output_imgc_path = f"projects/ee-speckerfelix/assets/oemc-spectral/spectral-indices_s2-srf-yearly-gapfill_{CONFIG['GAPFILLING']['INPUT_RESOLUTION']}m_{CONFIG['GAPFILLING']['VERSION']}"
     else:
         output_imgc_path = f"projects/ee-speckerfelix/assets/oemc-spectral/spectral-indices_s2-srf-yearly-spatfill_{CONFIG['GAPFILLING']['INPUT_RESOLUTION']}m_{CONFIG['GAPFILLING']['VERSION']}"
@@ -113,6 +115,7 @@ def export_spatial_gapfill(
             region=img.geometry().bounds(),
             crs=export_crs,
             crsTransform=export_crs_transform,
+            maxPixels=1e11,
         )
         task.start()
         return None
@@ -155,10 +158,12 @@ def export_temp_fill(
     )
 
     img_output = ee.Image(
-        img_output.copyProperties(img)
-        .set("system:time_start", img.get("system:time_start"))
-        .set("system:time_end", img.get("system:time_end"))
-        .set("temporal_gapfilling", True)
+        img_output.set("year", img.getString("year"))
+        .set("mgrs_tile", img.getString("mgrs_tile"))
+        .set("version", img.getString("version"))
+        .set("int8_scale", img.getNumber("int8_scale"))
+        .set("system:time_start", img.getNumber("system:time_start"))
+        .set("system:time_end", img.getNumber("system:time_end"))
     )
 
     export_crs, export_crs_transform = get_projection_info(img)
@@ -173,6 +178,7 @@ def export_temp_fill(
             region=img.geometry().bounds(),
             crs=export_crs,
             crsTransform=export_crs_transform,
+            maxPixels=1e11,
         )
         task.start()
         return None
@@ -285,7 +291,6 @@ def complete_sequential_gapfill() -> None:
     imgc_output_path = imgc_input_path.replace(
         "spectral-indices_s2-srf-yearly", "spectral-indices_s2-srf-yearly-gapfill"
     )
-    input_collection = "raw"
 
     imgc_output = ee.ImageCollection(imgc_output_path)
     system_indices_input = imgc_input.aggregate_array("system:index").getInfo()
@@ -294,6 +299,12 @@ def complete_sequential_gapfill() -> None:
     indices_to_be_processed = list(
         set(system_indices_input) - set(system_indices_output)
     )
+
+    if len(indices_to_be_processed) >= 3000:
+        logger.warning(
+            f"More than 3000 images to be gapfilled. Only processing the first 2000."
+        )
+        indices_to_be_processed = indices_to_be_processed[:2000]
 
     logger.info(
         f"Starting sequential gapfilling for {len(indices_to_be_processed)} images."
@@ -316,13 +327,13 @@ def complete_sequential_gapfill() -> None:
 if __name__ == "__main__":
     # pass
     # export_spatial_gapfill(
-    #     system_index="spectral-indices_s2-srf-yearly_m_1000m_s_20190101_20191231_T54M_epsg-32754_v01"
+    #     system_index="spectral-indices_s2-srf-yearly_m_100m_s_20190101_20191231_T01G_epsg-32701_v01"
     # )
     # export_temp_fill(
-    #     system_index="spectral-indices_s2-srf-yearly_m_1000m_s_20210101_20211231_T55M_epsg-32755_v01"
+    #     system_index="spectral-indices_s2-srf-yearly_m_100m_s_20190101_20191231_T01G_epsg-32701_v01"
     # )
     # export_sequential_gapfill(
-    #     system_index="spectral-indices_s2-srf-yearly_m_1000m_s_20210101_20211231_T55M_epsg-32755_v01"
+    #     system_index="spectral-indices_s2-srf-yearly_m_100m_s_20190101_20191231_T01G_epsg-32701_v01"
     # )
     # complete_temporal_gapfill()
 

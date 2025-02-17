@@ -137,11 +137,11 @@ def export_mgrs_tile(mgrs_tile: str, year: int) -> None:
     output_image = (
         output_image.set("system:time_start", ee.Date.fromYMD(int(year), 1, 1).millis())
         .set("system:time_end", ee.Date.fromYMD(int(year), 12, 31).millis())
-        .set("year", str(year))
-        .set("version", version)
+        .set("year", ee.String(year))
+        .set("version", ee.String(version))
         .set("system:index", system_index)
-        .set("mgrs_tile", mgrs_tile)
-        .set("int8_scale", CONFIG["PIPELINE_PARAMS"]["INT8_SCALE"])
+        .set("mgrs_tile", ee.String(mgrs_tile))
+        .set("int8_scale", ee.Number(CONFIG["PIPELINE_PARAMS"]["INT8_SCALE"]))
     )
 
     # Define bit positions from CONFIG
@@ -211,7 +211,15 @@ def subset_mgrs_years_tiles(mgrs_tiles: list, years: list, max_tasks: int):
 
     if len(system_indices_todo) <= max_tasks:
         logger.debug(f"Number of tasks to be executed: {len(system_indices_todo)}")
-        return mgrs_tiles, years
+        mgrs_tiles_todo = list(
+            set(
+                [
+                    system_index.split("_")[-3][1:5]
+                    for system_index in system_indices_todo
+                ]
+            )
+        )
+        return mgrs_tiles_todo, years
 
     logger.debug(f"Not export all mgrs_tiles and years, only a subset.")
     # ensure mgrs_tiles_subset * years_subset <= max_tasks
@@ -244,7 +252,7 @@ def global_export_mgrs_tiles(years: list):
             f"Too many tasks to start: {len((mgrs_tiles_list) * len(years))} > 3000. Only exporting a subset."
         )
         mgrs_tiles_list, years = subset_mgrs_years_tiles(
-            mgrs_tiles_list, years, max_tasks=100
+            mgrs_tiles_list, years, max_tasks=2900
         )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
@@ -312,8 +320,8 @@ if __name__ == "__main__":
 
     # wait 1 hour
     # time.sleep(3 * 3600)
-    subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
-    # global_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
+    # subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
+    global_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
     # subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
     # subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
     # subset_export_mgrs_tiles(years=CONFIG["PIPELINE_PARAMS"]["YEARS"])
